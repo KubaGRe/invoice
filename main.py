@@ -6,69 +6,56 @@ class Invoice:
 
     def create_invoice(self):
         with open(self.file, "w") as f:
-            f.writelines("Header")
-            f.writelines("\n")
-            f.writelines("ID{:>28}{:>30}{:>30}{:>30}".format("Name"[:28], "Surname"[:30], "Patronymic"[:30], "Address"[:30]))
-            f.writelines("\n")
-            f.writelines("\n")
-            f.writelines("\n")
-            f.writelines("Transaction")
-            f.writelines("\n")
-            f.writelines("ID{:>6}{:>12}{:>3}{:>97}".format("Cnt"[:6], "Amount"[:12], "Cur"[:3], "Reserved"[:97]))
-            f.writelines("\n")
-            f.writelines("\n")
-            f.writelines("Footer")
-            f.writelines("\n")
-            f.writelines("ID{:>6}{:>12}{:>100}".format("Total"[:6], "Control Sum"[:12], "Reserved"[:100]))
-            f.writelines("\n")
-            f.writelines("\n")
+            pass
 
 
 class InvoiceHandler:
     def __init__(self, invoice):
         self.file = invoice
+        self.counter = 0
+        self.amount = 0
+        self.lines = []
+        self.invoice = []
+        self.header = ""
+        self.transactions = []
+        self.footer = ""
+
+    def read_invoice_data(self):
         self.lines = self.read_invoice()
         self.amount = self.calculate_amount()
         self.counter = self.count_transactions()
+        self.header = self.lines[0]
+        self.transactions = self.read_transactions()
+        self.footer = self.lines[-1]
 
+    def add_transaction(self, amount, currency):
+        self.write_data_to_transaction(amount, currency)
+        self.write_data_to_footer()
+        self.commit()
 
-
-    def write_data_to_header(self, name, surname, patronymics, address):
-        with open(self.file, "r") as f:
-            lines = f.readlines()
-        lines.insert(2, f"01{name[:28]:>28}{surname[:30]:>30}{patronymics[:30]:>30}{address[:30]:>30}")
+    def commit(self):
+        lines=[self.header]
+        lines = lines + self.transactions
+        lines.append(self.footer)
         with open(self.file, "w") as f:
             f.writelines(lines)
-        self.lines = lines
+
+    def write_data_to_header(self, name, surname, patronymics, address):
+        self.header = f"01{name[:28]:>28}{surname[:30]:>30}{patronymics[:30]:>30}{address[:30]:>30}\n"
 
     def write_data_to_transaction(self, amount, currency, reserved=""):
         if self.counter < 20000:
             self.amount += int(amount)
             self.counter += 1
-            with open(self.file, "r") as f:
-                lines = f.readlines()
-            empty_line = 5
-            for line in lines[5:]:
-                if line == "\n":
-                    lines.insert(empty_line, f"02{str(self.counter)[:6]:>06}{amount[:12]:>012}{currency[:3]:>3}{reserved[:97]:>97}\n")
-                    break
-                empty_line += 1
-
-            with open(self.file, "w") as f:
-                f.writelines(lines)
-            self.lines = lines
-            self.write_data_to_footer()
+            transaction = f"02{str(self.counter)[:6]:>06}{amount[:12]:>012}{currency[:3]:>3}{reserved[:97]:>97}\n"
+            self.transactions.append(transaction)
         else:
             return "Max transaction limit exceeded"
 
     def write_data_to_footer(self, reserved=""):
         total = self.amount
-        with open(self.file, "r") as f:
-            lines = f.readlines()
-        with open(self.file, "w") as f:
-            lines[-1] = f"03{str(self.counter)[:6]:>06}{str(total)[:12]:>012}{reserved[:100]:>100}"
-            f.writelines(lines)
-        self.lines = lines
+        footer = f"03{str(self.counter)[:6]:>06}{str(total)[:12]:>012}{reserved[:100]:>100}"
+        self.footer = footer
 
     def read_invoice(self):
         with open(self.file, 'r') as f:
@@ -76,26 +63,27 @@ class InvoiceHandler:
         return lines
 
     def read_header(self):
-        return self.lines[2]
+        return self.header
 
     def read_transactions(self):
-        transactions = list(map(str.strip, self.lines[6:self.lines.index("Footer\n")-1]))
-        return transactions
+        transactions = list(map(str.strip, self.lines[1:-1]))
+        return [tr+"\n" for tr in transactions]
 
     def read_transaction(self, transaction_number):
         searched_transaction = ""
         transactions = self.read_transactions()
         for transaction in transactions:
             searched_transaction = re.search("02(\d\d\d\d\d\d)0000000(\d\d\d\d\d)([a-zA-Z]+)" ,transaction)
-            if transaction_number == int(searched_transaction.group(1)):
+            print(searched_transaction.group(1))
+            if transaction_number == searched_transaction.group(1).lstrip("0"):
                 break
         return searched_transaction.string
 
     def read_footer(self):
-        return self.lines[-1]
+        return self.footer
 
     def modify_header(self, new_data):
-        header = self.read_header()
+        header = self.header
         header_data = re.search("01\s+([a-zA-Z]+)\s+([a-zA-Z]+)\s+([a-zA-Z]+)\s+([a-zA-Z]+)", header)
         current_name = header_data.group(1)
         current_surname = header_data.group(2)
@@ -110,8 +98,10 @@ class InvoiceHandler:
                 current_patronymic = value
             if key == "address":
                 current_address = value
-        new_header = f"01{current_name[:28]:>28}{current_surname[:30]:>30}{current_patronymic[:30]:>30}{current_address[:30]:>30}"
-        self.update_invoice(header, new_header)
+        self.header = f"01{current_name[:28]:>28}{current_surname[:30]:>30}{current_patronymic[:30]:>30}{current_address[:30]:>30}\n"
+        self.write_data_to_footer()
+        self.commit()
+        # self.update_invoice(header, new_header)
 
     def modify_transaction(self, id, modyfication):
         transaction = self.read_transaction(id)
@@ -128,31 +118,32 @@ class InvoiceHandler:
                 current_amount = value
             if key == "currency":
                 current_currency = value
-        new_transaction = f"02{str(counter)[:6]:>06}{current_amount[:12]:>012}{current_currency[:3]:>3}{current_reserved[:97]:>97}"
-
-        self.update_invoice(transaction, new_transaction)
+        new_transaction = f"02{str(counter)[:6]:>06}{current_amount[:12]:>012}{current_currency[:3]:>3}{current_reserved[:97]:>97}\n"
+        self.transactions = [new_transaction if x == transaction else x for x in self.transactions]
+        self.write_data_to_footer()
+        self.commit()
+        # self.update_invoice(transaction, new_transaction)
 
     def count_transactions(self):
         return len(self.read_transactions())
 
     def calculate_amount(self):
         transactions = self.read_transactions()
-
         amount = 0
         for transaction in transactions:
             transaction_data = re.search("02(\d\d\d\d\d\d)0000000(\d\d\d\d\d)([a-zA-Z]+)([a-zA-Z]+)", transaction)
             amount += int(transaction_data.group(2))
         return amount
 
-    def update_invoice(self, old_value, new_value):
-        self.write_data_to_footer()
-        with open(self.file, "w") as f:
-            for line in self.lines:
-                if line.strip() == old_value.strip():
-                    f.write(new_value)
-                    f.write("\n")
-                else:
-                    f.write(line)
+    # def update_invoice(self, old_value, new_value):
+    #     self.write_data_to_footer()
+    #     with open(self.file, "w") as f:
+    #         for line in self.lines:
+    #             if line.strip() == old_value.strip():
+    #                 f.write(new_value)
+    #                 f.write("\n")
+    #             else:
+    #                 f.write(line)
 
     def read_value_of_specific_field(self):
         field = input("What kind of field? [(H)eader : (T)ransactions : (F)ooter]\n")
@@ -179,19 +170,19 @@ class InvoiceHandler:
             transaction = self.read_transaction(transaction_number)
             print(transaction)
             if transaction:
-                value = input("What kind of Value? [(C)ounter : (A)mount : (C)urrency : (R)eserved]\n")
+                value = input("What kind of Value? [(C)ounter : (A)mount : (Cu)rrency : (R)eserved]\n")
                 if value == "C":
                     print(transaction[3:8].lstrip("0"))
                     return transaction[3:8].lstrip("0")
                 elif value == "A":
                     print(transaction[9:20].lstrip("0"))
                     return transaction[9:20].lstrip("0")
-                elif value == "C":
-                    print(transaction[21:23])
-                    return transaction[21:23]
+                elif value == "Cu":
+                    print(transaction[20:23])
+                    return transaction[20:23]
                 elif value == "R":
-                    print(transaction[24:])
-                    return transaction[24:]
+                    print(transaction[23:])
+                    return transaction[23:]
                 else:
                     print("Wrong input")
 
@@ -211,6 +202,9 @@ class InvoiceHandler:
                 print("Wrong input")
         else:
             print("Wrong input")
+
+
+
 
 
 class GUI:
@@ -244,6 +238,8 @@ class GUI:
                     invoice_handler.write_data_to_transaction(amount, currency)
                     add_transaction = input("Do you want to add transaction? [y/n]\n")
                     add_transaction = add_transaction.lower()
+                invoice_handler.write_data_to_footer()
+                invoice_handler.commit()
                 print("!!!Invoice created!!!")
             elif command == "2":
                 print("--------------------------------")
@@ -251,11 +247,13 @@ class GUI:
                 print("--------------------------------")
                 invoice = input("Pass name[.txt] of existing invoice\n")
                 invoice_handler = InvoiceHandler(invoice)
+                invoice_handler.read_invoice_data()
                 print("1. Print invoice")
                 print("2. Modify invoice")
-                print("3. Exit")
+                print("3. Add transaction")
+                print("4. Exit")
                 internal_command = input()
-                while (internal_command != "3"):
+                while (internal_command != "4"):
                     if internal_command == "1":
                         print("--------------------------------")
                         print("------  Printing invoice  ------")
@@ -328,14 +326,21 @@ class GUI:
                             print("Closing")
                         else:
                             print("Invalid command, closing.")
-
                     elif internal_command == "3":
+                        amount = input("Amount?")
+                        currency = input("Currency?")
+                        invoice_handler.add_transaction(amount, currency)
+
+                    elif internal_command == "4":
                         print("Closing invoice")
                         break
+                    else:
+                        print("Wrong input")
 
                     print("1. Print invoice")
                     print("2. Modify invoice")
-                    print("3. Exit")
+                    print("3. Add transaction")
+                    print("4. Exit")
                     internal_command = input()
 
             elif command == "3":
