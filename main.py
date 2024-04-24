@@ -41,6 +41,7 @@ class InvoiceHandler:
         lines=[self.header]
         lines = lines + self.transactions
         lines.append(self.footer)
+        self.lines = lines
         with open(self.file, "w") as f:
             f.writelines(lines)
 
@@ -74,13 +75,6 @@ class InvoiceHandler:
         return [tr+"\n" for tr in transactions]
 
     def read_transaction(self, transaction_number):
-        searched_transaction = ""
-        # transactions = self.read_transactions()
-        # for transaction in transactions:
-        #     searched_transaction = re.search("02(\d\d\d\d\d\d)0000000(\d\d\d\d\d)([a-zA-Z]+)" ,transaction)
-        #     print(searched_transaction.group(1))
-        #     if transaction_number == searched_transaction.group(1).lstrip("0"):
-        #         break
         index = int(transaction_number) - 1
         return self.transactions[index]
 
@@ -106,7 +100,6 @@ class InvoiceHandler:
         self.header = f"01{current_name[:28]:>28}{current_surname[:30]:>30}{current_patronymic[:30]:>30}{current_address[:30]:>30}\n"
         self.write_data_to_footer()
         self.commit()
-        # self.update_invoice(header, new_header)
 
     def modify_transaction(self, id, modyfication):
         transaction = self.read_transaction(id)
@@ -126,7 +119,6 @@ class InvoiceHandler:
         self.transactions = [new_transaction if x == transaction else x for x in self.transactions]
         self.write_data_to_footer()
         self.commit()
-        # self.update_invoice(transaction, new_transaction)
 
     def count_transactions(self):
         return len(self.read_transactions())
