@@ -67,7 +67,7 @@ class InvoiceHandler:
         """
         Method responsible for saving changes to file and updating cache
         """
-        lines=[self.header]
+        lines = [self.header]
         lines = lines + self.transactions
         lines.append(self.footer)
         self.lines = lines
@@ -169,7 +169,7 @@ class InvoiceHandler:
                 current_patronymic = value
             if key == "address":
                 current_address = value
-        self.header = f"01{current_name[:28]:>28}{current_surname[:30]:>30}{current_patronymic[:30]:>30}{current_address[:30]:>30}\n "
+        self.header = f"01{current_name[:28]:>28}{current_surname[:30]:>30}{current_patronymic[:30]:>30}{current_address[:30]:>30}\n"
         self.write_data_to_footer()
         self.commit()
 
@@ -180,7 +180,7 @@ class InvoiceHandler:
         :param modyfication: Dict with data for transaction to be changed to
         """
         transaction = self.read_transaction(id)
-        transaction_data = re.search("02(\d\d\d\d\d\d)0000000(\d\d\d\d\d)([a-zA-Z]+)" ,transaction)
+        transaction_data = re.search("02(\d\d\d\d\d\d)0000000(\d\d\d\d\d)([a-zA-Z]+)", transaction)
         counter = transaction_data.group(1)
         current_amount = transaction_data.group(2)
         current_currency = transaction_data.group(3)
@@ -397,9 +397,7 @@ class APP:
             surname = input("Surname?\n")
             address = input("Address?\n")
             patronymic = input("Patronymic?\n")
-            if not name or not surname or not patronymic:
-                print("Invalid input")
-                return None
+
             modification = dict()
             if name:
                 modification["name"] = name
