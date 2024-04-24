@@ -43,7 +43,7 @@ def test_modify_header(prepare_full_invoice_with_data):
     prepare_full_invoice_with_data.modify_header(new_header)
     assert prepare_full_invoice_with_data.read_header().split() == '01     Jacob       Grela         Peterson      ' \
                                                                    '   Cracow\n'.split()
-    
+
 
 # ----- FIXTURES -----
 @pytest.fixture()
